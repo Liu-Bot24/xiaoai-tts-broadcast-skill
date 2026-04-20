@@ -1,0 +1,15 @@
+XiaoAI TTS Broadcast Skill
+
+This project contains code adapted from the xiaoai-tts skill in:
+
+  https://github.com/coderzc/open-xiaoai-bridge
+
+The upstream project is licensed under the MIT License. Its copyright notices
+are preserved in this package's LICENSE file.
+
+This package adds long-text broadcast support and OpenClaw broadcast-mode
+instructions for reading prepared text through a XiaoAI speaker via
+Open-XiaoAI Bridge.
+
+This project is unofficial and is not affiliated with Xiaomi, OpenClaw, or the
+Open-XiaoAI Bridge maintainers.
