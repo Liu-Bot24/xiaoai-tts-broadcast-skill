@@ -49,6 +49,11 @@ xiaoai-tts handle "启动小爱播报模式" --scope feishu-default
 xiaoai-tts handle "要播报的正文" --scope feishu-default
 xiaoai-tts handle "退出播报模式" --scope feishu-default
 
+# Windows 原生环境使用 tools\xiaoai-tts.cmd
+xiaoai-tts.cmd handle "启动小爱播报模式" --scope feishu-default
+xiaoai-tts.cmd handle "要播报的正文" --scope feishu-default
+xiaoai-tts.cmd handle "退出播报模式" --scope feishu-default
+
 # 唤醒小爱
 xiaoai-tts wakeup
 xiaoai-tts wakeup --silent   # 静默唤醒
@@ -72,6 +77,7 @@ xiaoai-tts voices -v 1.0     # 仅 1.0 音色
 播报模式是硬状态，状态保存在运行本 Skill 的机器本地文件中：
 
 - 默认路径：`~/.xiaoai-tts/broadcast_state.json`
+- Windows 默认路径：`%USERPROFILE%\.xiaoai-tts\broadcast_state.json`
 - 可用环境变量 `XIAOAI_TTS_STATE_PATH` 覆盖。
 - `--scope` 用于隔离不同聊天、群聊或用户；如果能拿到飞书 chat id / open id / session id，必须作为 scope。拿不到时使用 `feishu-default`。
 

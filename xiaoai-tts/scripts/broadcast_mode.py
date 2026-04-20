@@ -20,6 +20,11 @@ try:
 except ImportError:  # pragma: no cover - non-Unix fallback
     fcntl = None
 
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - non-Windows fallback
+    msvcrt = None
+
 
 START_COMMANDS = {
     "/小爱播报",
@@ -89,11 +94,19 @@ def locked_state_file(state_path: Path):
     with open(lock_path, "w", encoding="utf-8") as lock:
         if fcntl:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        elif msvcrt:
+            lock.write("lock")
+            lock.flush()
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
         try:
             yield
         finally:
             if fcntl:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            elif msvcrt:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def load_state(state_path: Path) -> dict:

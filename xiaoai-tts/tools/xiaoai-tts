@@ -3,6 +3,7 @@
 XiaoAI TTS Tool - 统一的小爱音箱控制工具
 """
 import argparse
+import shutil
 import subprocess
 import sys
 import os
@@ -12,6 +13,17 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 
+def python_command():
+    """Return a Python command that works across Linux, macOS, and Windows."""
+    if sys.executable:
+        return [sys.executable]
+    for candidate in ("python3", "python"):
+        if shutil.which(candidate):
+            return [candidate]
+    if os.name == "nt" and shutil.which("py"):
+        return ["py", "-3"]
+    return ["python3"]
+
 def run_script(script_name, args_list, capture=True):
     """运行指定的 Python 脚本"""
     script_path = os.path.join(SCRIPTS_DIR, script_name)
@@ -19,7 +31,7 @@ def run_script(script_name, args_list, capture=True):
         print(f"错误: 脚本不存在 {script_path}", file=sys.stderr)
         return None, "", "脚本不存在", 1
     
-    cmd = ["python3", script_path] + args_list
+    cmd = python_command() + [script_path] + args_list
     
     if capture:
         result = subprocess.run(cmd, capture_output=True, text=True)

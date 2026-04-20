@@ -38,10 +38,11 @@ XiaoAI TTS Broadcast Skill 是一个给 OpenClaw 使用的小爱音箱播报 Ski
 ```text
 <openclaw-skills-dir>/xiaoai-tts/SKILL.md
 <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
+<openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts.cmd
 <openclaw-skills-dir>/xiaoai-tts/scripts/...
 ```
 
-如果解压工具没有保留可执行权限，执行：
+Linux/macOS 如果解压工具没有保留可执行权限，执行：
 
 ```bash
 chmod +x <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
@@ -49,10 +50,20 @@ chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_text.py
 chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_mode.py
 ```
 
-在 OpenClaw 的运行环境中配置桥接服务地址：
+Windows 原生环境可以使用 `tools\xiaoai-tts.cmd`，并确保 Python 3 可通过 `py -3` 或 `python` 启动。
+
+在 OpenClaw 的运行环境中配置桥接服务地址。
+
+Linux/macOS:
 
 ```bash
 export OPENXIAOAI_BASE_URL="http://YOUR_BRIDGE_HOST:9092"
+```
+
+Windows PowerShell:
+
+```powershell
+$env:OPENXIAOAI_BASE_URL = "http://YOUR_BRIDGE_HOST:9092"
 ```
 
 然后按你的 OpenClaw 部署方式重新加载 Skill 或重启 OpenClaw。
@@ -68,12 +79,36 @@ export OPENXIAOAI_BASE_URL="http://YOUR_BRIDGE_HOST:9092"
 | `--timeout` | 每段播报的超时时间，单位毫秒 | 否 | `600000` |
 | `--pause` | 分段之间的停顿秒数 | 否 | `0.4` |
 
+## Windows 兼容性
+
+本 Skill 支持 Windows 原生环境，但要求 OpenClaw 能调用本 Skill 目录下的 `tools\xiaoai-tts.cmd`，并且系统已安装 Python 3。
+
+Windows 下状态文件默认位于当前用户目录：
+
+```text
+%USERPROFILE%\.xiaoai-tts\broadcast_state.json
+```
+
+如果需要自定义状态文件路径：
+
+```powershell
+$env:XIAOAI_TTS_STATE_PATH = "$env:USERPROFILE\.xiaoai-tts\broadcast_state.json"
+```
+
+Windows 文件锁使用 `msvcrt`，Linux/macOS 文件锁使用 `fcntl`，用于避免并发消息同时修改播报模式状态。
+
 ## 使用
 
 检查桥接服务是否可用：
 
 ```bash
 xiaoai-tts health
+```
+
+Windows:
+
+```powershell
+.\xiaoai-tts\tools\xiaoai-tts.cmd health
 ```
 
 播报短文本：
