@@ -1,198 +1,140 @@
 # XiaoAI TTS Broadcast Skill
 
-XiaoAI TTS Broadcast Skill 是一个给 OpenClaw 使用的小爱音箱播报 Skill。它通过 [Open-XiaoAI Bridge](https://github.com/coderzc/open-xiaoai-bridge) 的 HTTP API，把 OpenClaw Agent 收到的文字、通知、文章或长篇故事发送到小爱音箱朗读。
+XiaoAI TTS Broadcast Skill 是一个 OpenClaw Skill，用来把飞书、聊天消息、文章、通知或小说文本转发给小爱音箱朗读。它不直接连接小爱音箱，而是调用 [Open-XiaoAI Bridge](https://github.com/coderzc/open-xiaoai-bridge) 的 HTTP API，由桥接服务控制小爱音箱播放。
 
-这个项目不是独立的小爱音箱服务，也不能替代 Open-XiaoAI Bridge。它的定位是一个配套 Skill：OpenClaw 负责理解你的聊天指令，Open-XiaoAI Bridge 负责连接小爱音箱，本 Skill 负责把文本交给桥接服务播报。
+它解决的问题很简单：你可以先在飞书或 OpenClaw 里准备好一段文本，再让小爱音箱读出来；也可以开启播报模式，让同一个聊天会话里的后续消息自动转成小爱播报，直到你发送退出指令。
 
-## 能做什么
+## 功能
 
-- 让 OpenClaw Agent 调用小爱音箱播报文字。
-- 支持长文本播报模式，适合小说、文章、飞书消息和提前生成好的文本。
-- 自动把长文本切成较小段落，按顺序播放，避免一次性 TTS 文本过长导致失败。
-- 内置本地状态机，支持“启动播报模式 / 后续消息自动播报 / 退出播报模式”的硬状态。
-- 保留原有小爱控制能力，包括健康检查、播放状态、唤醒、文字播报、音频文件、远程 URL 和可选豆包 TTS。
-- 支持在 OpenClaw 对话里进入“小爱播报模式”：用户发送正文后，Agent 原样交给小爱读出来。
+- 通过 Open-XiaoAI Bridge 调用小爱音箱原生 TTS。
+- 支持长文本自动分段，适合小说、长文、会议摘要和通知。
+- 支持有状态播报模式：启动后，同一会话里的后续消息会继续转发给小爱，退出后停止。
+- 支持 Linux、macOS、Windows、WSL 和常见 OpenClaw 容器环境。
+- 保留健康检查、播放状态、唤醒、打断、文本播报、音频文件和 URL 播放能力。
 
-## 工作方式
-
-你需要先准备好：
-
-- 已部署并连接小爱音箱的 Open-XiaoAI Bridge。
-- 能加载本 Skill 的 OpenClaw Agent 运行环境。
-- OpenClaw 所在机器能访问 Open-XiaoAI Bridge 的 HTTP API。
-
-典型链路：
+## 工作链路
 
 ```text
-飞书或 OpenClaw 对话 -> OpenClaw Agent -> 本 Skill -> Open-XiaoAI Bridge -> 小爱音箱
+飞书或聊天消息 -> OpenClaw Agent -> 本 Skill -> Open-XiaoAI Bridge -> 小爱音箱
 ```
 
-飞书和小爱音箱不是同一个频道。本 Skill 的作用是让 OpenClaw Agent 在收到飞书消息时调用 `xiaoai-tts handle`，由这个命令在本地记录播报模式状态，并在状态开启时把消息转发给 Open-XiaoAI Bridge 播报。
+飞书和小爱音箱不是同一个频道。这个 Skill 的作用是让 OpenClaw Agent 在收到消息时调用 `xiaoai-tts handle`，由工具自己保存播报模式状态，并在状态开启时把消息交给小爱朗读。
 
 ## 安装
 
-下载本仓库或 Release 压缩包，把 `xiaoai-tts` 目录复制到 OpenClaw 使用的 skills 目录中。
-
-安装后的目录结构应类似：
+如果 OpenClaw 支持从 GitHub 链接安装 Skill，直接安装这个仓库：
 
 ```text
-<openclaw-skills-dir>/xiaoai-tts/SKILL.md
-<openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
-<openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts.cmd
-<openclaw-skills-dir>/xiaoai-tts/scripts/...
+https://github.com/Liu-Bot24/xiaoai-tts-broadcast-skill
 ```
 
-Linux/macOS 如果解压工具没有保留可执行权限，执行：
-
-```bash
-chmod +x <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
-chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_text.py
-chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_mode.py
-```
-
-Windows 原生环境可以使用 `tools\xiaoai-tts.cmd`，并确保 Python 3 可通过 `py -3` 或 `python` 启动。
-
-在 OpenClaw 的运行环境中配置桥接服务地址。
-
-Linux/macOS:
-
-```bash
-export OPENXIAOAI_BASE_URL="http://YOUR_BRIDGE_HOST:9092"
-```
-
-Windows PowerShell:
-
-```powershell
-$env:OPENXIAOAI_BASE_URL = "http://YOUR_BRIDGE_HOST:9092"
-```
-
-然后按你的 OpenClaw 部署方式重新加载 Skill 或重启 OpenClaw。
-
-## 配置项
-
-| 配置项 | 作用 | 是否必需 | 示例 |
-| --- | --- | --- | --- |
-| `OPENXIAOAI_BASE_URL` | Open-XiaoAI Bridge HTTP API 地址 | 是 | `http://192.168.6.237:9092` |
-| `XIAOAI_TTS_STATE_PATH` | 播报模式状态文件路径 | 否 | `~/.xiaoai-tts/broadcast_state.json` |
-| `--scope` | 播报状态作用域，用来隔离不同飞书聊天或用户 | 否 | `feishu-default` |
-| `--max-chars` | 每段播报的最大字数 | 否 | `450` |
-| `--timeout` | 每段播报的超时时间，单位毫秒 | 否 | `600000` |
-| `--pause` | 分段之间的停顿秒数 | 否 | `0.4` |
-
-## Windows 兼容性
-
-本 Skill 支持 Windows 原生环境，但要求 OpenClaw 能调用本 Skill 目录下的 `tools\xiaoai-tts.cmd`，并且系统已安装 Python 3。
-
-Windows 下状态文件默认位于当前用户目录：
+如果手动安装，把仓库解压或克隆到 OpenClaw 的 skills 目录。技能根目录需要包含：
 
 ```text
-%USERPROFILE%\.xiaoai-tts\broadcast_state.json
+SKILL.md
+tools/xiaoai-tts
+tools/xiaoai-tts.cmd
+xiaoai-tts/scripts/...
 ```
 
-如果需要自定义状态文件路径：
+也可以只复制仓库里的 `xiaoai-tts` 子目录作为 Skill；这种方式下技能根目录应包含：
 
-```powershell
-$env:XIAOAI_TTS_STATE_PATH = "$env:USERPROFILE\.xiaoai-tts\broadcast_state.json"
+```text
+SKILL.md
+tools/xiaoai-tts
+tools/xiaoai-tts.cmd
+scripts/...
 ```
 
-Windows 文件锁使用 `msvcrt`，Linux/macOS 文件锁使用 `fcntl`，用于避免并发消息同时修改播报模式状态。
+Linux/macOS 如果工具没有执行权限，运行：
 
-## 使用
+```bash
+chmod +x <skill-dir>/tools/xiaoai-tts
+```
 
-检查桥接服务是否可用：
+Windows 原生环境使用 `tools\xiaoai-tts.cmd`，并安装 Python 3.8 或更新版本。
+
+## 配置
+
+在 OpenClaw 实际运行的环境里设置桥接服务地址：
+
+```bash
+OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+```
+
+如果 OpenClaw 由 systemd、Docker、Windows 服务或守护进程启动，要把这个变量写进对应的持久环境配置里，而不是只在临时终端里 `export`。
+
+| 配置项 | 作用 | 推荐值 |
+| --- | --- | --- |
+| `OPENXIAOAI_BASE_URL` | Open-XiaoAI Bridge HTTP API 地址 | `http://192.168.6.237:9092` |
+| `XIAOAI_TTS_STATE_PATH` | 播报模式状态保存位置 | 默认即可 |
+| `--scope` | 区分不同飞书聊天、用户或会话 | 飞书 chat id / open id / session id |
+| `--max-chars` | 每段最大字数 | `450` |
+| `--timeout` | 每段播放超时，毫秒 | `600000` |
+| `--pause` | 分段间隔，秒 | `0.4` |
+
+## 验证
+
+在 OpenClaw 运行环境里执行：
 
 ```bash
 xiaoai-tts health
+xiaoai-tts text "这是一条小爱播报测试。" --blocking
 ```
 
-Windows:
+Windows PowerShell：
 
 ```powershell
-.\xiaoai-tts\tools\xiaoai-tts.cmd health
+.\tools\xiaoai-tts.cmd health
+.\tools\xiaoai-tts.cmd text "这是一条小爱播报测试。" --blocking
 ```
 
-播报短文本：
+如果提示找不到 `xiaoai-tts`，把 `<skill-dir>/tools` 加入 OpenClaw 运行环境的 `PATH`，或让 Agent 使用完整路径调用工具。
+
+## 使用
+
+直接播报短文本：
 
 ```bash
-xiaoai-tts text "这是一条小爱播报测试。"
+xiaoai-tts text "这是一条小爱播报测试。" --blocking
 ```
 
 播报长文本：
 
 ```bash
-cat story.txt | xiaoai-tts broadcast --stdin
-```
-
-从文件播报：
-
-```bash
 xiaoai-tts broadcast --file story.txt
-```
-
-调整分段长度：
-
-```bash
-xiaoai-tts broadcast --file story.txt --max-chars 500 --pause 0.5
+cat story.txt | xiaoai-tts broadcast --stdin
 ```
 
 开启播报模式：
 
 ```bash
-xiaoai-tts mode on --scope feishu-default
+xiaoai-tts handle "启动小爱播报模式" --scope feishu-default
 ```
 
-处理一条飞书消息：
+处理后续消息：
 
 ```bash
-xiaoai-tts handle "要播报的正文" --scope feishu-default
+xiaoai-tts handle "这里是要朗读的正文。" --scope feishu-default
 ```
 
 退出播报模式：
 
 ```bash
-xiaoai-tts mode off --scope feishu-default
+xiaoai-tts handle "退出播报模式" --scope feishu-default
 ```
 
-## 在 OpenClaw 里使用播报模式
+`handle` 会自动判断启动、退出、转发或忽略。启动和退出指令本身不会被播报。
 
-安装 Skill 后，可以在飞书或 OpenClaw 对话里对 Agent 说：
+## 给 OpenClaw Agent 的安装提示
+
+可以把这段发给另一台设备上的 OpenClaw：
 
 ```text
-启动小爱播报模式。
+请安装这个 OpenClaw Skill：https://github.com/Liu-Bot24/xiaoai-tts-broadcast-skill
+安装后把 OPENXIAOAI_BASE_URL 持久配置为 http://192.168.6.237:9092，并确认 xiaoai-tts health 可以运行。
+飞书播报模式请按仓库里的 OPERATOR.md 接入。
 ```
-
-之后发送你想朗读的正文。Skill 说明会要求 Agent 不总结、不改写、不续写，而是把正文原样交给 `xiaoai-tts broadcast` 播报。
-
-退出播报模式时说：
-
-```text
-退出播报模式。
-```
-
-为了让状态足够稳定，建议让 OpenClaw Agent 对相关飞书消息统一调用：
-
-```bash
-xiaoai-tts handle "<飞书消息原文>" --scope "<稳定的飞书会话标识>"
-```
-
-`handle` 会自行判断：
-
-- 收到启动指令时开启播报模式，不播报指令本身。
-- 收到退出指令时关闭播报模式，不播报指令本身。
-- 模式开启时，把正文分段转发给小爱音箱播报。
-- 模式关闭时，忽略普通正文。
-
-如果拿不到飞书 chat id、open id 或 OpenClaw session id，可以使用固定 scope，例如 `feishu-default`。如果你有多个群聊或多个用户同时使用，建议为每个会话使用不同 scope，避免互相影响。
-
-## 适合的场景
-
-- 先在飞书或其他工具里生成小说，再让小爱音箱朗读。
-- 把长文章、通知、会议摘要或待办清单发给 OpenClaw，由小爱播报。
-- 让 Agent 在需要播报时调用小爱音箱，而不是把所有内容塞进一次语音对话。
-
-## 边界
-
-本 Skill 只提供 OpenClaw 可调用的工具和本地状态机，不修改 OpenClaw、Open-XiaoAI Bridge 或小爱音箱固件。OpenClaw 仍然需要把飞书消息路由给 Agent，并允许 Agent 调用本 Skill。只要 Agent 对消息调用 `xiaoai-tts handle`，播报模式状态就由工具本身维护，不依赖模型记忆。
 
 ## 授权与来源
 

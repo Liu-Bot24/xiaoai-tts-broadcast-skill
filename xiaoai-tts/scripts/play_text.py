@@ -34,7 +34,7 @@ def play_text(text, blocking=False, timeout=60000):
     )
     
     mode = "阻塞模式" if blocking else "非阻塞模式"
-    print(f"✅ 已发送播放请求 [{mode}]: {text[:50]}{'...' if len(text) > 50 else ''}")
+    print(f"OK: 已发送播放请求 [{mode}]: {text[:50]}{'...' if len(text) > 50 else ''}")
     return result
 
 
@@ -56,11 +56,11 @@ def main():
     try:
         result = play_text(args.text, blocking=blocking, timeout=args.timeout)
         if result.get("success"):
-            print(f"🎵 播放成功")
+            print("OK: 播放请求已接受")
         else:
-            print(f"⚠️ 播放可能失败: {result}")
+            print(f"WARN: 播放可能失败: {result}")
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

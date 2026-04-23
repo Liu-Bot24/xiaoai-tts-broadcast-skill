@@ -36,7 +36,7 @@ def main():
         result = list_voices(version=version)
         
         if not result.get("success"):
-            print(f"❌ 获取失败: {result}")
+            print(f"ERROR: 获取失败: {result}")
             sys.exit(1)
         
         data = result.get("data", {})
@@ -48,10 +48,10 @@ def main():
                 if ver not in versions:
                     continue
                 v = versions[ver]
-                print(f"\n🎙️  {ver} 音色 - {v.get('description', '')} (共 {v.get('count', 0)} 个)")
+                print(f"\n{ver} 音色 - {v.get('description', '')} (共 {v.get('count', 0)} 个)")
                 print("-" * 70)
                 for voice_type, name in v.get("voices", {}).items():
-                    emotion = "✨多情感" if "emo" in voice_type else ""
+                    emotion = "多情感" if "emo" in voice_type else ""
                     print(f"  {name:16} | {voice_type} {emotion}")
             print(f"\n共 {data.get('total_voices', 0)} 个音色")
 
@@ -59,14 +59,14 @@ def main():
         elif "voices" in data:
             ver = data.get("version", "")
             voices = data["voices"]
-            print(f"\n🎙️  {ver} 音色 (共 {data.get('count', 0)} 个)")
+            print(f"\n{ver} 音色 (共 {data.get('count', 0)} 个)")
             print("-" * 70)
             for voice_type, name in voices.items():
-                emotion = "✨多情感" if "emo" in voice_type else ""
+                emotion = "多情感" if "emo" in voice_type else ""
                 print(f"  {name:16} | {voice_type} {emotion}")
         
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

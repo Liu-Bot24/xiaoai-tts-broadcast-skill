@@ -54,7 +54,7 @@ def play_file(file_path, blocking=False):
             result = json.loads(response.read().decode("utf-8"))
             
             mode = "阻塞模式" if blocking else "非阻塞模式"
-            print(f"✅ 上传并播放 [{mode}]: {filename}")
+            print(f"OK: 上传并播放 [{mode}]: {filename}")
             return result
     except urllib.error.HTTPError as e:
         error_msg = f"HTTP 错误: {e.code} - {e.reason}"
@@ -74,11 +74,11 @@ def main():
     try:
         result = play_file(args.file, blocking=args.blocking)
         if result.get("success"):
-            print(f"🎵 播放成功")
+            print("OK: 播放请求已接受")
         else:
-            print(f"⚠️ 播放可能失败: {result}")
+            print(f"WARN: 播放可能失败: {result}")
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

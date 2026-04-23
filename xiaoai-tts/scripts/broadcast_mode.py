@@ -7,6 +7,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -24,6 +25,11 @@ try:
     import msvcrt
 except ImportError:  # pragma: no cover - non-Windows fallback
     msvcrt = None
+
+
+DEFAULT_SCOPE = "feishu-default"
+COMMAND_EDGE_CHARS = " \t\r\n.,;:!?，。；：！？、\"'“”‘’（）()[]【】<>《》"
+WINDOWS_LOCK_TIMEOUT_SECONDS = 10
 
 
 START_COMMANDS = {
@@ -47,6 +53,15 @@ START_COMMANDS = {
     "开启播报模式",
     "进入播报模式",
     "开始播报模式",
+    "启动朗读模式",
+    "开启朗读模式",
+    "进入朗读模式",
+    "下面这段用小爱读出来",
+    "下面用小爱读出来",
+    "后面用小爱读出来",
+    "下面这段用小爱播报",
+    "下面用小爱播报",
+    "后面用小爱播报",
 }
 
 STOP_COMMANDS = {
@@ -73,18 +88,50 @@ STOP_COMMANDS = {
     "关闭播报模式",
     "不用读了",
     "不要播报了",
+    "别读了",
+    "不用播了",
+    "取消播报模式",
+    "取消小爱播报模式",
 }
 
 
 def normalize_command(text: str) -> str:
-    return " ".join((text or "").strip().split()).lower()
+    value = (text or "").strip().lower().strip(COMMAND_EDGE_CHARS)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip(COMMAND_EDGE_CHARS)
+
+
+NORMALIZED_START_COMMANDS = {normalize_command(item) for item in START_COMMANDS}
+NORMALIZED_STOP_COMMANDS = {normalize_command(item) for item in STOP_COMMANDS}
+
+
+def command_matches(command: str, commands: set) -> bool:
+    if command in commands:
+        return True
+    if command.startswith("/") or len(command) > 48:
+        return False
+    return any(item and item in command for item in commands if not item.startswith("/"))
 
 
 def default_state_path() -> Path:
     configured = os.environ.get("XIAOAI_TTS_STATE_PATH")
     if configured:
-        return Path(configured).expanduser()
+        return Path(os.path.expandvars(configured)).expanduser()
     return Path.home() / ".xiaoai-tts" / "broadcast_state.json"
+
+
+def lock_windows_file(lock) -> None:
+    if not msvcrt:
+        return
+    deadline = time.time() + WINDOWS_LOCK_TIMEOUT_SECONDS
+    while True:
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError:
+            if time.time() >= deadline:
+                raise
+            time.sleep(0.05)
 
 
 @contextlib.contextmanager
@@ -98,7 +145,7 @@ def locked_state_file(state_path: Path):
             lock.write("lock")
             lock.flush()
             lock.seek(0)
-            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+            lock_windows_file(lock)
         try:
             yield
         finally:
@@ -106,7 +153,8 @@ def locked_state_file(state_path: Path):
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
             elif msvcrt:
                 lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+                with contextlib.suppress(OSError):
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def load_state(state_path: Path) -> dict:
@@ -223,7 +271,7 @@ def print_result(result: dict, json_output: bool = False) -> None:
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 
-def handle_text(args) -> int:
+def handle_text(args, process_commands: bool = True) -> int:
     state_path = default_state_path()
     text = read_text(args).strip()
     command = normalize_command(text)
@@ -235,15 +283,23 @@ def handle_text(args) -> int:
         )
         return 0
 
-    if command in {normalize_command(item) for item in START_COMMANDS}:
-        result = set_mode(args.scope, True, state_path)
+    if process_commands and command_matches(command, NORMALIZED_START_COMMANDS):
+        result = {"scope": args.scope, "enabled": True, "state_path": str(state_path)}
+        if not args.dry_run:
+            result = set_mode(args.scope, True, state_path)
         result["action"] = "mode_on"
+        if args.dry_run:
+            result["dry_run"] = True
         print_result(result, args.json)
         return 0
 
-    if command in {normalize_command(item) for item in STOP_COMMANDS}:
-        result = set_mode(args.scope, False, state_path)
+    if process_commands and command_matches(command, NORMALIZED_STOP_COMMANDS):
+        result = {"scope": args.scope, "enabled": False, "state_path": str(state_path)}
+        if not args.dry_run:
+            result = set_mode(args.scope, False, state_path)
         result["action"] = "mode_off"
+        if args.dry_run:
+            result["dry_run"] = True
         print_result(result, args.json)
         return 0
 
@@ -270,7 +326,19 @@ def handle_text(args) -> int:
         print_result(result, args.json)
         return 0
 
-    code = broadcast(text, args.max_chars, args.timeout, args.pause)
+    try:
+        code = broadcast(text, args.max_chars, args.timeout, args.pause)
+    except Exception as exc:
+        result = {
+            "action": "failed",
+            "scope": args.scope,
+            "chunks": len(chunks),
+            "chars": len(text),
+            "exit_code": 1,
+            "error": str(exc),
+        }
+        print_result(result, args.json)
+        return 1
     if code == 0:
         note_forward(args.scope, state_path)
     result = {
@@ -303,7 +371,7 @@ def add_text_args(parser):
     parser.add_argument("text", nargs="?", help="当前聊天消息正文")
     parser.add_argument("--file", "-f", help="从 UTF-8 文本文件读取正文")
     parser.add_argument("--stdin", action="store_true", help="从标准输入读取正文")
-    parser.add_argument("--scope", default="default", help="播报状态作用域，建议使用飞书会话 ID")
+    parser.add_argument("--scope", default=DEFAULT_SCOPE, help="播报状态作用域，建议使用飞书会话 ID")
     parser.add_argument("--max-chars", type=int, default=450, help="每段最大字数，默认 450")
     parser.add_argument("--timeout", type=int, default=600000, help="每段播放超时，毫秒，默认 600000")
     parser.add_argument("--pause", type=float, default=0.4, help="分段间隔秒数，默认 0.4")
@@ -318,7 +386,7 @@ def main():
 
     mode_parser = subparsers.add_parser("mode", help="开启、关闭或查看播报模式")
     mode_parser.add_argument("mode", choices=["on", "off", "status"])
-    mode_parser.add_argument("--scope", default="default", help="播报状态作用域")
+    mode_parser.add_argument("--scope", default=DEFAULT_SCOPE, help="播报状态作用域")
     mode_parser.add_argument("--json", action="store_true", help="输出 JSON")
 
     handle_parser = subparsers.add_parser("handle", help="处理一条聊天消息：识别开启/退出/转发/忽略")
@@ -330,8 +398,10 @@ def main():
     args = parser.parse_args()
     if args.command == "mode":
         sys.exit(mode_command(args))
-    if args.command in {"handle", "forward"}:
-        sys.exit(handle_text(args))
+    if args.command == "handle":
+        sys.exit(handle_text(args, process_commands=True))
+    if args.command == "forward":
+        sys.exit(handle_text(args, process_commands=False))
     parser.print_help()
     sys.exit(1)
 

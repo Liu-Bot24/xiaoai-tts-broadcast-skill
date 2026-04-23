@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import time
+from typing import List
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from play_text import play_text
@@ -22,17 +23,17 @@ def normalize_text(text: str) -> str:
     return "\n".join(line for line in lines if line).strip()
 
 
-def split_long_piece(piece: str, max_chars: int) -> list[str]:
+def split_long_piece(piece: str, max_chars: int) -> List[str]:
     return [piece[i : i + max_chars].strip() for i in range(0, len(piece), max_chars) if piece[i : i + max_chars].strip()]
 
 
-def split_text(text: str, max_chars: int) -> list[str]:
+def split_text(text: str, max_chars: int) -> List[str]:
     text = normalize_text(text)
     if not text:
         return []
 
     parts = BREAK_PATTERN.split(text)
-    sentences: list[str] = []
+    sentences: List[str] = []
     current = ""
     for part in parts:
         if not part:
@@ -44,7 +45,7 @@ def split_text(text: str, max_chars: int) -> list[str]:
     if current.strip():
         sentences.append(current.strip())
 
-    chunks: list[str] = []
+    chunks: List[str] = []
     current_chunk = ""
     for sentence in sentences:
         if len(sentence) > max_chars:
@@ -90,7 +91,11 @@ def broadcast(text: str, max_chars: int, timeout: int, pause: float) -> int:
     print(f"准备播报 {len(chunks)} 段文本")
     for index, chunk in enumerate(chunks, start=1):
         print(f"播报第 {index}/{len(chunks)} 段，{len(chunk)} 字")
-        result = play_text(chunk, blocking=True, timeout=timeout)
+        try:
+            result = play_text(chunk, blocking=True, timeout=timeout)
+        except Exception as exc:
+            print(f"第 {index} 段播报异常: {exc}", file=sys.stderr)
+            return 1
         if not result.get("success"):
             print(f"第 {index} 段播报失败: {result}", file=sys.stderr)
             return 1

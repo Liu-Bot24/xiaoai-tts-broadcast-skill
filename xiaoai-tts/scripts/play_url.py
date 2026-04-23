@@ -28,7 +28,7 @@ def play_url(url, blocking=False, timeout=60000):
     result = api_request("/api/play/url", method="POST", data=data)
     
     mode = "阻塞模式" if blocking else "非阻塞模式"
-    print(f"✅ 播放远程音频 [{mode}]: {url}")
+    print(f"OK: 播放远程音频 [{mode}]: {url}")
     return result
 
 
@@ -45,11 +45,11 @@ def main():
     try:
         result = play_url(args.url, blocking=args.blocking, timeout=args.timeout)
         if result.get("success"):
-            print(f"🎵 播放成功")
+            print("OK: 播放请求已接受")
         else:
-            print(f"⚠️ 播放可能失败: {result}")
+            print(f"WARN: 播放可能失败: {result}")
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

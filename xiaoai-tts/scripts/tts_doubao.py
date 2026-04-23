@@ -55,7 +55,7 @@ def tts_doubao(text, speaker=None, speed=1.0, emotion=None,
     mode = "阻塞模式" if blocking else "非阻塞模式"
     speaker_info = f"[{speaker or DEFAULT_SPEAKER}]"
     emotion_info = f"[{emotion}]" if emotion else ""
-    print(f"✅ 火山 TTS [{mode}]{speaker_info}{emotion_info}: {text[:50]}{'...' if len(text) > 50 else ''}")
+    print(f"OK: 火山 TTS [{mode}]{speaker_info}{emotion_info}: {text[:50]}{'...' if len(text) > 50 else ''}")
     return result
 
 
@@ -81,7 +81,7 @@ def main():
     
     # 验证语速范围
     if not 0.8 <= args.speed <= 2.0:
-        print("❌ 错误: 语速必须在 0.8-2.0 之间")
+        print("ERROR: 语速必须在 0.8-2.0 之间")
         sys.exit(1)
     
     try:
@@ -101,11 +101,11 @@ def main():
         )
         
         if result.get("success"):
-            print(f"🎵 火山 TTS 播放成功")
+            print("OK: 火山 TTS 播放请求已接受")
         else:
-            print(f"⚠️ 播放可能失败: {result}")
+            print(f"WARN: 播放可能失败: {result}")
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

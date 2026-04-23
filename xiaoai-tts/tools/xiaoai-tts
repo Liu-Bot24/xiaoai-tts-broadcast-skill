@@ -8,10 +8,21 @@ import subprocess
 import sys
 import os
 
+DEFAULT_SCOPE = "feishu-default"
+
 # 获取脚本目录
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+
+
+def configure_stdio():
+    """Keep Windows service logs from failing on Chinese output."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 def python_command():
     """Return a Python command that works across Linux, macOS, and Windows."""
@@ -32,15 +43,32 @@ def run_script(script_name, args_list, capture=True):
         return None, "", "脚本不存在", 1
     
     cmd = python_command() + [script_path] + args_list
+    env = os.environ.copy()
+    env.setdefault("PYTHONIOENCODING", "utf-8:replace")
     
     if capture:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+        )
         return result, result.stdout, result.stderr, result.returncode
     else:
-        result = subprocess.run(cmd)
+        result = subprocess.run(cmd, env=env)
         return result, "", "", result.returncode
 
+
+def print_captured(stdout, stderr):
+    if stdout:
+        print(stdout, end="")
+    if stderr:
+        print(stderr, end="", file=sys.stderr)
+
 def main():
+    configure_stdio()
     parser = argparse.ArgumentParser(
         description="XiaoAI TTS 控制工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -96,7 +124,7 @@ def main():
     # mode 命令 - 有状态播报模式
     mode_parser = subparsers.add_parser('mode', help='开启、关闭或查看小爱播报模式')
     mode_parser.add_argument('mode', choices=['on', 'off', 'status'], help='模式操作')
-    mode_parser.add_argument('--scope', default='default', help='状态作用域，建议使用飞书会话 ID')
+    mode_parser.add_argument('--scope', default=DEFAULT_SCOPE, help='状态作用域，建议使用飞书会话 ID')
     mode_parser.add_argument('--json', action='store_true', help='输出 JSON')
 
     # handle 命令 - 对单条聊天消息做状态机处理
@@ -104,7 +132,7 @@ def main():
     handle_parser.add_argument('content', nargs='?', help='聊天消息正文')
     handle_parser.add_argument('--file', '-f', help='从 UTF-8 文本文件读取正文')
     handle_parser.add_argument('--stdin', action='store_true', help='从标准输入读取正文')
-    handle_parser.add_argument('--scope', default='default', help='状态作用域，建议使用飞书会话 ID')
+    handle_parser.add_argument('--scope', default=DEFAULT_SCOPE, help='状态作用域，建议使用飞书会话 ID')
     handle_parser.add_argument('--max-chars', type=int, default=450, help='每段最大字数（默认 450）')
     handle_parser.add_argument('--timeout', '-t', type=int, default=600000, help='每段超时时间（毫秒，默认 600000）')
     handle_parser.add_argument('--pause', type=float, default=0.4, help='分段间隔秒数（默认 0.4）')
@@ -117,7 +145,7 @@ def main():
     forward_parser.add_argument('content', nargs='?', help='聊天消息正文')
     forward_parser.add_argument('--file', '-f', help='从 UTF-8 文本文件读取正文')
     forward_parser.add_argument('--stdin', action='store_true', help='从标准输入读取正文')
-    forward_parser.add_argument('--scope', default='default', help='状态作用域，建议使用飞书会话 ID')
+    forward_parser.add_argument('--scope', default=DEFAULT_SCOPE, help='状态作用域，建议使用飞书会话 ID')
     forward_parser.add_argument('--max-chars', type=int, default=450, help='每段最大字数（默认 450）')
     forward_parser.add_argument('--timeout', '-t', type=int, default=600000, help='每段超时时间（毫秒，默认 600000）')
     forward_parser.add_argument('--pause', type=float, default=0.4, help='分段间隔秒数（默认 0.4）')
@@ -176,13 +204,14 @@ def main():
             sys.exit(0)
         else:
             # Doubao 失败，回退到 text
-            print(f"⚠️ Doubao TTS 失败，回退到小爱自带 TTS...", file=sys.stderr)
+            print_captured(stdout, stderr)
+            print("WARN: Doubao TTS 失败，回退到小爱自带 TTS...", file=sys.stderr)
             text_args = [args.content]
             if args.blocking:
                 text_args.append('--blocking')
             if args.timeout != 60000:
                 text_args.extend(['--timeout', str(args.timeout)])
-            sys.exit(run_script('play_text.py', text_args)[3])
+            sys.exit(run_script('play_text.py', text_args, capture=False)[3])
     
     elif args.command == 'text':
         cmd_args = [args.content]
@@ -190,7 +219,7 @@ def main():
             cmd_args.append('--blocking')
         if args.timeout != 60000:
             cmd_args.extend(['--timeout', str(args.timeout)])
-        sys.exit(run_script('play_text.py', cmd_args)[3])
+        sys.exit(run_script('play_text.py', cmd_args, capture=False)[3])
 
     elif args.command == 'broadcast':
         cmd_args = []

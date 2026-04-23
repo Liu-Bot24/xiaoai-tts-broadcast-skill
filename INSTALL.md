@@ -1,84 +1,95 @@
-# XiaoAI TTS Broadcast Skill
+# Installation
 
-This package contains the `xiaoai-tts` skill with long-text broadcast support.
+## Requirements
 
-## Install On The OpenClaw Machine
+- OpenClaw can load local skills.
+- Python 3.8 or newer is available in the OpenClaw runtime.
+- The OpenClaw machine can reach Open-XiaoAI Bridge.
+- Open-XiaoAI Bridge HTTP API is enabled and reachable on port `9092`.
 
-1. Copy `xiaoai-tts-broadcast-skill.zip` to the machine that runs OpenClaw.
-2. Unzip it into the OpenClaw skills directory so the final layout is:
+For this setup, the bridge URL is:
 
-   ```text
-   <openclaw-skills-dir>/xiaoai-tts/SKILL.md
-   <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
-   <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts.cmd
-   <openclaw-skills-dir>/xiaoai-tts/scripts/...
-   ```
+```text
+http://192.168.6.237:9092
+```
 
-3. On Linux/macOS, make the tool executable if your unzip tool does not preserve permissions:
+## Install From GitHub
 
-   ```bash
-   chmod +x <openclaw-skills-dir>/xiaoai-tts/tools/xiaoai-tts
-   chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_text.py
-   chmod +x <openclaw-skills-dir>/xiaoai-tts/scripts/broadcast_mode.py
-   ```
+Install this repository as the skill:
 
-   On native Windows, use `tools\xiaoai-tts.cmd` and make sure Python 3 is available through `py -3` or `python`.
+```text
+https://github.com/Liu-Bot24/xiaoai-tts-broadcast-skill
+```
 
-4. Set the Open-XiaoAI Bridge URL in the environment where OpenClaw runs.
+The repository root is a valid skill root. It contains `SKILL.md` and `tools/`.
 
-   Linux/macOS:
+## Manual Install
 
-   ```bash
-   export OPENXIAOAI_BASE_URL="http://YOUR_BRIDGE_HOST:9092"
-   ```
+Put the repository into the OpenClaw skills directory, or copy the nested `xiaoai-tts` directory as a standalone skill.
 
-   Windows PowerShell:
+Repository-root layout:
 
-   ```powershell
-   $env:OPENXIAOAI_BASE_URL = "http://YOUR_BRIDGE_HOST:9092"
-   ```
+```text
+<skills-dir>/xiaoai-tts-broadcast-skill/SKILL.md
+<skills-dir>/xiaoai-tts-broadcast-skill/tools/xiaoai-tts
+<skills-dir>/xiaoai-tts-broadcast-skill/tools/xiaoai-tts.cmd
+```
 
-   Optional: set a custom state file for broadcast mode:
+Nested-skill layout:
 
-   ```bash
-   export XIAOAI_TTS_STATE_PATH="$HOME/.xiaoai-tts/broadcast_state.json"
-   ```
+```text
+<skills-dir>/xiaoai-tts/SKILL.md
+<skills-dir>/xiaoai-tts/tools/xiaoai-tts
+<skills-dir>/xiaoai-tts/tools/xiaoai-tts.cmd
+<skills-dir>/xiaoai-tts/scripts/...
+```
 
-   Windows PowerShell:
+Linux/macOS:
 
-   ```powershell
-   $env:XIAOAI_TTS_STATE_PATH = "$env:USERPROFILE\.xiaoai-tts\broadcast_state.json"
-   ```
+```bash
+chmod +x <skill-dir>/tools/xiaoai-tts
+```
 
-5. Reload or restart OpenClaw according to that machine's normal skill-loading workflow.
+## Persistent Environment
 
-## Test
+Set this in the same environment that starts OpenClaw:
 
-From the OpenClaw machine:
+```bash
+OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+```
+
+Examples:
+
+```bash
+# shell profile or startup script
+export OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+
+# Docker Compose
+OPENXIAOAI_BASE_URL=http://192.168.6.237:9092
+```
+
+PowerShell for the current process:
+
+```powershell
+$env:OPENXIAOAI_BASE_URL = "http://192.168.6.237:9092"
+```
+
+For Windows services, configure the variable in the service or OpenClaw startup configuration so it survives restarts.
+
+## Verify
+
+Run these from the OpenClaw runtime:
 
 ```bash
 xiaoai-tts health
-echo "这是一段小爱播报测试。" | xiaoai-tts broadcast --stdin
-xiaoai-tts handle "启动小爱播报模式" --scope feishu-default --dry-run
-xiaoai-tts handle "这是一段飞书正文。" --scope feishu-default --dry-run
-xiaoai-tts handle "退出播报模式" --scope feishu-default --dry-run
+xiaoai-tts text "这是一条小爱播报测试。" --blocking
 ```
 
-Windows PowerShell:
+Windows:
 
 ```powershell
-.\xiaoai-tts\tools\xiaoai-tts.cmd health
-.\xiaoai-tts\tools\xiaoai-tts.cmd handle "启动小爱播报模式" --scope feishu-default --dry-run
-.\xiaoai-tts\tools\xiaoai-tts.cmd handle "这是一段飞书正文。" --scope feishu-default --dry-run
-.\xiaoai-tts\tools\xiaoai-tts.cmd handle "退出播报模式" --scope feishu-default --dry-run
+.\tools\xiaoai-tts.cmd health
+.\tools\xiaoai-tts.cmd text "这是一条小爱播报测试。" --blocking
 ```
 
-## Usage In OpenClaw
-
-Ask the agent to enter XiaoAI broadcast mode. After that, send the text you want read aloud. The skill instructions tell the agent to pass the text through unchanged and call:
-
-```bash
-xiaoai-tts handle --stdin --scope <stable-feishu-scope>
-```
-
-Send "退出播报模式" or "停止播报模式" to leave the mode.
+If `xiaoai-tts` is not found, add `<skill-dir>/tools` to `PATH` or call the tool by full path.

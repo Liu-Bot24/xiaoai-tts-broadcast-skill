@@ -15,8 +15,11 @@ def main():
     parser.add_argument("command", 
                         choices=["health", "status", "wakeup", "interrupt"],
                         help="控制命令")
-    parser.add_argument("--silent", action=argparse.BooleanOptionalAction, default=False,
+    parser.add_argument("--silent", action="store_true",
                         help="静默唤醒（不播放提示音）；默认有声")
+    parser.add_argument("--no-silent", dest="silent", action="store_false",
+                        help="有声唤醒")
+    parser.set_defaults(silent=False)
     
     args = parser.parse_args()
     
@@ -28,13 +31,13 @@ def main():
                 status = data.get("status", "unknown")
                 speaker_ready = data.get("speaker_ready", False)
                 
-                status_icon = "✅" if status == "healthy" else "❌"
-                speaker_icon = "🎵" if speaker_ready else "🔇"
-                
-                print(f"{status_icon} 服务状态: {status}")
-                print(f"{speaker_icon} 音箱就绪: {'是' if speaker_ready else '否'}")
+                status_label = "OK" if status == "healthy" else "ERROR"
+                speaker_label = "OK" if speaker_ready else "WARN"
+
+                print(f"{status_label}: 服务状态: {status}")
+                print(f"{speaker_label}: 音箱就绪: {'是' if speaker_ready else '否'}")
             else:
-                print(f"⚠️ 健康检查异常: {result}")
+                print(f"WARN: 健康检查异常: {result}")
         
         elif args.command == "status":
             result = get_status()
@@ -43,32 +46,32 @@ def main():
                 status = data.get("status", "unknown")
                 
                 status_map = {
-                    "playing": "🎵 播放中",
-                    "paused": "⏸️ 已暂停",
-                    "idle": "💤 空闲"
+                    "playing": "播放中",
+                    "paused": "已暂停",
+                    "idle": "空闲"
                 }
-                print(status_map.get(status, f"❓ 未知状态: {status}"))
+                print(status_map.get(status, f"未知状态: {status}"))
             else:
-                print(f"⚠️ 获取状态失败: {result}")
+                print(f"WARN: 获取状态失败: {result}")
         
         elif args.command == "wakeup":
             silent = args.silent
             result = wakeup(silent=silent)
             if result.get("success"):
                 mode = "静默" if silent else "有声"
-                print(f"✅ 已唤醒小爱 [{mode}模式]")
+                print(f"OK: 已唤醒小爱 [{mode}模式]")
             else:
-                print(f"⚠️ 唤醒失败: {result}")
+                print(f"WARN: 唤醒失败: {result}")
         
         elif args.command == "interrupt":
             result = interrupt()
             if result.get("success"):
-                print("✅ 已打断当前播放")
+                print("OK: 已打断当前播放")
             else:
-                print(f"⚠️ 打断失败: {result}")
+                print(f"WARN: 打断失败: {result}")
     
     except Exception as e:
-        print(f"❌ 错误: {e}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 

@@ -49,9 +49,11 @@ def api_request(path, method="GET", data=None, headers=None, timeout=30):
         try:
             error_body = json.loads(e.read().decode("utf-8"))
             error_msg += f"\n详情: {error_body}"
-        except:
+        except Exception:
             pass
         raise Exception(error_msg)
+    except urllib.error.URLError as e:
+        raise Exception(f"无法连接 Open-XiaoAI Bridge: {full_url} ({e.reason})")
     except Exception as e:
         raise Exception(f"请求失败: {e}")
 
