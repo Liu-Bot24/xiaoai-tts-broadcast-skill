@@ -1,5 +1,7 @@
 # XiaoAI TTS Broadcast Skill
 
+![Stars](https://img.shields.io/github/stars/Liu-Bot24/xiaoai-tts-broadcast-skill?style=flat&label=Stars&cache=20260704) ![Forks](https://img.shields.io/github/forks/Liu-Bot24/xiaoai-tts-broadcast-skill?style=flat&label=Forks&cache=20260704) ![Views 14d](https://github-stats.liu-qi.cn/api/badge/Liu-Bot24/xiaoai-tts-broadcast-skill/views14d.svg?v=4) ![Clones 14d](https://github-stats.liu-qi.cn/api/badge/Liu-Bot24/xiaoai-tts-broadcast-skill/clones14d.svg?v=4)
+
 XiaoAI TTS Broadcast Skill 是一个 OpenClaw Skill，用来把飞书、聊天消息、文章、通知或小说文本转发给小爱音箱朗读。它不直接连接小爱音箱，而是调用 [Open-XiaoAI Bridge](https://github.com/coderzc/open-xiaoai-bridge) 的 HTTP API，由桥接服务控制小爱音箱播放。
 
 它解决的问题很简单：你可以先在飞书或 OpenClaw 里准备好一段文本，再让小爱音箱读出来；也可以开启播报模式，让同一个聊天会话里的后续消息自动转成小爱播报，直到你发送退出指令。
