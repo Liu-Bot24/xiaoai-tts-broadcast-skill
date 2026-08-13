@@ -7,10 +7,10 @@
 - The OpenClaw machine can reach Open-XiaoAI Bridge.
 - Open-XiaoAI Bridge HTTP API is enabled and reachable on port `9092`.
 
-For this setup, the bridge URL is:
+For example, the bridge URL may be:
 
 ```text
-http://192.168.6.237:9092
+http://192.168.1.50:9092
 ```
 
 ## Install From GitHub
@@ -32,7 +32,7 @@ Repository-root layout:
 ```text
 <skills-dir>/xiaoai-tts-broadcast-skill/SKILL.md
 <skills-dir>/xiaoai-tts-broadcast-skill/tools/xiaoai-tts
-<skills-dir>/xiaoai-tts-broadcast-skill/tools/xiaoai-tts.cmd
+<skills-dir>/xiaoai-tts-broadcast-skill/tools/xiaoai-tts.ps1
 ```
 
 Nested-skill layout:
@@ -40,7 +40,7 @@ Nested-skill layout:
 ```text
 <skills-dir>/xiaoai-tts/SKILL.md
 <skills-dir>/xiaoai-tts/tools/xiaoai-tts
-<skills-dir>/xiaoai-tts/tools/xiaoai-tts.cmd
+<skills-dir>/xiaoai-tts/tools/xiaoai-tts.ps1
 <skills-dir>/xiaoai-tts/scripts/...
 ```
 
@@ -55,23 +55,23 @@ chmod +x <skill-dir>/tools/xiaoai-tts
 Set this in the same environment that starts OpenClaw:
 
 ```bash
-OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+OPENXIAOAI_BASE_URL="http://<bridge-host>:9092"
 ```
 
 Examples:
 
 ```bash
 # shell profile or startup script
-export OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+export OPENXIAOAI_BASE_URL="http://192.168.1.50:9092"
 
 # Docker Compose
-OPENXIAOAI_BASE_URL=http://192.168.6.237:9092
+OPENXIAOAI_BASE_URL=http://192.168.1.50:9092
 ```
 
 PowerShell for the current process:
 
 ```powershell
-$env:OPENXIAOAI_BASE_URL = "http://192.168.6.237:9092"
+$env:OPENXIAOAI_BASE_URL = "http://192.168.1.50:9092"
 ```
 
 For Windows services, configure the variable in the service or OpenClaw startup configuration so it survives restarts.
@@ -88,8 +88,12 @@ xiaoai-tts text "这是一条小爱播报测试。" --blocking
 Windows:
 
 ```powershell
-.\tools\xiaoai-tts.cmd health
-.\tools\xiaoai-tts.cmd text "这是一条小爱播报测试。" --blocking
+.\tools\xiaoai-tts.ps1 health
+.\tools\xiaoai-tts.ps1 text "这是一条小爱播报测试。" --blocking
 ```
+
+Do not recreate a `.cmd` wrapper for this tool. Windows sends batch-file command lines through `cmd.exe`, which can reinterpret quotes and metacharacters in arbitrary message text. Use the PowerShell launcher or invoke `python .\tools\xiaoai-tts` directly.
+
+When upgrading by copying files over an older installation, explicitly remove every stale `tools\xiaoai-tts.cmd` copy. A normal `git pull` removes the tracked legacy launchers automatically.
 
 If `xiaoai-tts` is not found, add `<skill-dir>/tools` to `PATH` or call the tool by full path.

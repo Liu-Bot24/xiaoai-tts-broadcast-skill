@@ -1,100 +1,83 @@
 ---
 name: xiaoai-tts
-description: Use this OpenClaw skill to broadcast text through XiaoAI speakers via Open-XiaoAI Bridge. Trigger it for 小爱播报, 小爱朗读, 读出来, 语音播报, Feishu broadcast mode, 启动/开启/进入小爱播报模式, 退出/停止/关闭播报模式, and every later Feishu/chat message while broadcast mode may be active. Stateful Feishu/chat broadcast mode must call `xiaoai-tts handle`, not `broadcast`.
+description: Broadcast text through a XiaoAI speaker via Open-XiaoAI Bridge. Use for 小爱播报, 小爱朗读, 读出来, 语音播报, starting or stopping XiaoAI broadcast mode, and every later message in a chat whose broadcast mode may be active.
+metadata:
+  {
+    "openclaw":
+      {
+        "requires":
+          {
+            "anyBins": ["python3", "python", "py"],
+            "env": ["OPENXIAOAI_BASE_URL"],
+          },
+      },
+  }
 ---
 
 # XiaoAI TTS Broadcast
 
-This skill sends text from OpenClaw to XiaoAI speakers through the Open-XiaoAI Bridge HTTP API.
+Use this skill to send text to a XiaoAI speaker through Open-XiaoAI Bridge.
 
-## Required Environment
+## Mandatory safe invocation
 
-The OpenClaw runtime must have:
+For stateful chat broadcast mode, pass every relevant message to `handle`. Keep the command string static and put the exact message and conversation scope in the exec tool's `env` object.
 
-```bash
-OPENXIAOAI_BASE_URL="http://<bridge-host>:9092"
+Use the first available Python command:
+
+- Linux/macOS: `python3 "{baseDir}/tools/xiaoai-tts" handle --from-env --json`
+- Alternative: `python "{baseDir}/tools/xiaoai-tts" handle --from-env --json`
+- Windows with the Python Launcher: `py -3 "{baseDir}/tools/xiaoai-tts" handle --from-env --json`
+
+Call the exec tool with fields equivalent to:
+
+```json
+{
+  "command": "python3 \"{baseDir}/tools/xiaoai-tts\" handle --from-env --json",
+  "env": {
+    "XIAOAI_TTS_MESSAGE": "<exact current message>",
+    "XIAOAI_TTS_SCOPE": "<stable conversation id>"
+  }
+}
 ```
 
-For this user's bridge, the expected value is:
+Never interpolate the message or scope into `command`, even after quoting or escaping it. Never invoke a `.cmd` file with message text. The `env` values are data, not shell syntax.
 
-```bash
-OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+Use the same stable scope for start commands, ordinary messages, and stop commands. Prefer the channel chat ID, sender ID, or OpenClaw session ID. Use `feishu-default` only when no stable identifier exists.
+
+## Routing contract
+
+Call `handle --from-env --json` when:
+
+- The user sends a complete start command such as `启动小爱播报模式`, `开启播报模式`, `/小爱播报`, or `下面这段用小爱读出来`.
+- The user sends a complete stop command such as `退出播报模式`, `停止小爱播报模式`, `不用读了`, or `/退出小爱播报`.
+- Broadcast mode may already be active for that conversation. Route every later message so the state machine can forward or ignore it.
+
+Interpret the JSON `action` field:
+
+- `mode_on`: mode was enabled; do not separately broadcast the command.
+- `mode_off`: mode was disabled; do not separately broadcast the command.
+- `forwarded`: the message was sent to the speaker.
+- `ignored`: mode was off, or the message was empty.
+- `failed`, or any nonzero exit code: report the failure; do not claim playback succeeded.
+
+Do not use `mode on` alone for chat integration: it changes state but does not route future messages into this skill. Do not use `broadcast` for persistent mode because it bypasses start and stop handling.
+
+## Immediate one-off playback
+
+When the user explicitly asks to read one message immediately without persistent mode, use the same structured environment call and append `--force` to the static command:
+
+```text
+python3 "{baseDir}/tools/xiaoai-tts" handle --from-env --force --json
 ```
 
-Use Python 3.8 or newer. On native Windows, call `xiaoai-tts.cmd` if `xiaoai-tts` is not available.
+For input too large for an environment variable, create a UTF-8 temporary file with a structured file-writing tool. Give it an agent-generated filename containing only letters, digits, dots, underscores, or hyphens, then call `handle --file <trusted-path>`. Never create the file with shell interpolation, a heredoc, or a filename derived from message text.
 
-## Commands
+## Static maintenance commands
 
-Health check:
+These commands contain no user-controlled text:
 
-```bash
-xiaoai-tts health
-```
-
-Short text with XiaoAI native TTS:
-
-```bash
-xiaoai-tts text "这是一条播报测试。" --blocking
-```
-
-Long text:
-
-```bash
-xiaoai-tts broadcast --file story.txt
-cat story.txt | xiaoai-tts broadcast --stdin
-```
-
-Stateful broadcast mode:
-
-```bash
-xiaoai-tts handle "启动小爱播报模式" --scope feishu-default
-xiaoai-tts handle "要播报的正文" --scope feishu-default
-xiaoai-tts handle "退出播报模式" --scope feishu-default
-```
-
-## Broadcast Mode Contract
-
-Always use `xiaoai-tts handle` for Feishu/chat broadcast mode.
-
-When the user says any start command such as "启动小爱播报模式", "开启播报模式", "/小爱播报", or "下面这段用小爱读出来", call:
-
-```bash
-xiaoai-tts handle "<用户原文>" --scope <stable-chat-scope>
-```
-
-When the user says any stop command such as "退出播报模式", "停止小爱播报模式", "不用读了", or "/退出小爱播报", call the same command form:
-
-```bash
-xiaoai-tts handle "<用户原文>" --scope <stable-chat-scope>
-```
-
-After broadcast mode has been started, every later Feishu/chat message from the same conversation must also be passed to:
-
-```bash
-xiaoai-tts handle "<用户原文>" --scope <stable-chat-scope>
-```
-
-Use the same scope for start, body messages, and stop. Prefer Feishu chat id, open id, or OpenClaw session id. If no stable id is available, use `feishu-default`.
-
-For long messages, use stdin or a UTF-8 file:
-
-```bash
-cat /path/to/message.txt | xiaoai-tts handle --stdin --scope <stable-chat-scope>
-```
-
-`handle` is the state machine:
-
-- Start command: turns mode on and does not broadcast the command itself.
-- Stop command: turns mode off and does not broadcast the command itself.
-- Mode on: forwards the message to XiaoAI in ordered chunks.
-- Mode off: ignores ordinary messages.
-
-Do not use `xiaoai-tts mode on` alone for Feishu broadcast mode; it only flips state and does not make future messages enter this skill. Do not use `xiaoai-tts broadcast` for stateful mode; it bypasses start/stop handling.
-
-## Direct Forwarding
-
-Use `broadcast` or `handle --force` only when the user explicitly asks to read a specific text immediately and no persistent mode is needed:
-
-```bash
-xiaoai-tts handle "请直接读这段文字" --force --scope feishu-default
+```text
+python3 "{baseDir}/tools/xiaoai-tts" health
+python3 "{baseDir}/tools/xiaoai-tts" status
+python3 "{baseDir}/tools/xiaoai-tts" interrupt
 ```

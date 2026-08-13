@@ -2,18 +2,23 @@
 """Repository-root launcher for direct GitHub skill installs."""
 
 import os
+import subprocess
 import sys
 
 
-def main() -> None:
+def main() -> int:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     repo_dir = os.path.dirname(script_dir)
     tool = os.path.join(repo_dir, "xiaoai-tts", "tools", "xiaoai-tts")
     if not os.path.exists(tool):
         print(f"ERROR: nested tool not found: {tool}", file=sys.stderr)
-        sys.exit(1)
-    os.execv(sys.executable, [sys.executable, tool] + sys.argv[1:])
+        return 1
+    result = subprocess.run(
+        [sys.executable, tool] + sys.argv[1:],
+        check=False,
+    )
+    return result.returncode
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

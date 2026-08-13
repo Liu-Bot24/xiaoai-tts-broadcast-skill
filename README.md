@@ -35,7 +35,7 @@ https://github.com/Liu-Bot24/xiaoai-tts-broadcast-skill
 ```text
 SKILL.md
 tools/xiaoai-tts
-tools/xiaoai-tts.cmd
+tools/xiaoai-tts.ps1
 xiaoai-tts/scripts/...
 ```
 
@@ -44,7 +44,7 @@ xiaoai-tts/scripts/...
 ```text
 SKILL.md
 tools/xiaoai-tts
-tools/xiaoai-tts.cmd
+tools/xiaoai-tts.ps1
 scripts/...
 ```
 
@@ -54,23 +54,26 @@ Linux/macOS 如果工具没有执行权限，运行：
 chmod +x <skill-dir>/tools/xiaoai-tts
 ```
 
-Windows 原生环境使用 `tools\xiaoai-tts.cmd`，并安装 Python 3.8 或更新版本。
+Windows 原生环境使用 `tools\xiaoai-tts.ps1`，并安装 Python 3.8 或更新版本。项目不再提供 `.cmd` 启动器，因为 `cmd.exe` 会在批处理脚本运行前重新解析消息参数，无法安全承载任意聊天正文。
+
+如果是覆盖文件方式升级旧版本，请确认删除遗留的 `tools\xiaoai-tts.cmd`；如果同时保留了仓库根和 `xiaoai-tts` 子目录两套布局，两处旧 `.cmd` 都要删除。使用 `git pull` 正常更新时 Git 会自动移除这些已删除文件。
 
 ## 配置
 
 在 OpenClaw 实际运行的环境里设置桥接服务地址：
 
 ```bash
-OPENXIAOAI_BASE_URL="http://192.168.6.237:9092"
+OPENXIAOAI_BASE_URL="http://<bridge-host>:9092"
 ```
 
 如果 OpenClaw 由 systemd、Docker、Windows 服务或守护进程启动，要把这个变量写进对应的持久环境配置里，而不是只在临时终端里 `export`。
 
 | 配置项 | 作用 | 推荐值 |
 | --- | --- | --- |
-| `OPENXIAOAI_BASE_URL` | Open-XiaoAI Bridge HTTP API 地址 | `http://192.168.6.237:9092` |
+| `OPENXIAOAI_BASE_URL` | Open-XiaoAI Bridge HTTP API 地址 | `http://<bridge-host>:9092` |
 | `XIAOAI_TTS_STATE_PATH` | 播报模式状态保存位置 | 默认即可 |
-| `--scope` | 区分不同飞书聊天、用户或会话 | 飞书 chat id / open id / session id |
+| `XIAOAI_TTS_MESSAGE` | OpenClaw 结构化传入的原始消息 | 由 Agent 每次调用时设置 |
+| `XIAOAI_TTS_SCOPE` | 区分不同聊天、用户或会话 | chat id / open id / session id |
 | `--max-chars` | 每段最大字数 | `450` |
 | `--timeout` | 每段播放超时，毫秒 | `600000` |
 | `--pause` | 分段间隔，秒 | `0.4` |
@@ -87,8 +90,8 @@ xiaoai-tts text "这是一条小爱播报测试。" --blocking
 Windows PowerShell：
 
 ```powershell
-.\tools\xiaoai-tts.cmd health
-.\tools\xiaoai-tts.cmd text "这是一条小爱播报测试。" --blocking
+.\tools\xiaoai-tts.ps1 health
+.\tools\xiaoai-tts.ps1 text "这是一条小爱播报测试。" --blocking
 ```
 
 如果提示找不到 `xiaoai-tts`，把 `<skill-dir>/tools` 加入 OpenClaw 运行环境的 `PATH`，或让 Agent 使用完整路径调用工具。
@@ -128,13 +131,29 @@ xiaoai-tts handle "退出播报模式" --scope feishu-default
 
 `handle` 会自动判断启动、退出、转发或忽略。启动和退出指令本身不会被播报。
 
+### OpenClaw 安全调用
+
+Agent 不应把聊天正文拼进 shell 命令。命令保持固定，把正文和会话 ID 放进 exec 工具的 `env` 对象：
+
+```json
+{
+  "command": "python3 \"{baseDir}/tools/xiaoai-tts\" handle --from-env --json",
+  "env": {
+    "XIAOAI_TTS_MESSAGE": "<原始聊天消息>",
+    "XIAOAI_TTS_SCOPE": "<稳定会话 ID>"
+  }
+}
+```
+
+`--json` 成功时只输出一个 JSON 文档；进程非零退出时必须按失败处理。完整路由约定见 `SKILL.md` 和 `OPERATOR.md`。
+
 ## 给 OpenClaw Agent 的安装提示
 
 可以把这段发给另一台设备上的 OpenClaw：
 
 ```text
 请安装这个 OpenClaw Skill：https://github.com/Liu-Bot24/xiaoai-tts-broadcast-skill
-安装后把 OPENXIAOAI_BASE_URL 持久配置为 http://192.168.6.237:9092，并确认 xiaoai-tts health 可以运行。
+安装后把 OPENXIAOAI_BASE_URL 持久配置为你的 Open-XiaoAI Bridge 地址，并确认 xiaoai-tts health 可以运行。
 飞书播报模式请按仓库里的 OPERATOR.md 接入。
 ```
 
